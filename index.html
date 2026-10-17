@@ -38,7 +38,8 @@ h2.sec{font-family:var(--display); font-weight:600; font-size:24px; margin:0 0 4
 .presets{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
 button{font:inherit; cursor:pointer}
 .preset{border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:6px 13px; border-radius:999px; font-size:13px}
-.preset:hover{border-color:var(--accent)}
+.preset:hover,.btn:hover{border-color:var(--accent)}
+.btn{border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:6px 13px; border-radius:999px; font-size:13px}
 .preset[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 .block{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px}
@@ -91,6 +92,13 @@ svg text{font-family:var(--mono); font-size:10.5px; fill:var(--muted)}
 .notes a{color:var(--accent)}
 footer{border-top:1px solid var(--line); padding-top:16px; font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between}
 @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+.numin{width:84px; font:inherit; font-family:var(--mono); font-size:12px; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:3px 6px}
+.numin::placeholder{color:var(--muted)}
+.suptable td.num,.suptable th.num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+.suptable .per{display:block; font-size:11px; color:var(--muted); margin-top:2px}
+.suptable{min-width:640px}
+.actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.cover.bad{color:var(--bad)} .cover.warn{color:var(--warn)} .cover.good{color:var(--good)}
 </style>
 </head>
 <body>
@@ -99,7 +107,7 @@ footer{border-top:1px solid var(--line); padding-top:16px; font-size:12px; color
     <div class="eyebrow">Bundibugyo virus disease · SEIHFR model · Nairobi vs Mombasa</div>
     <h1>Kenya BVD Outbreak Simulator</h1>
     <p class="lede">Seed two imported Ebola (Bundibugyo) cases in each city, then test how isolation beds, detection speed and community response decide whether the outbreak is contained. A planning tool, not a forecast.</p>
-    <span class="tag">v2 · matches the modelling article · 16 Oct 2026</span>
+    <span class="tag">v3 · adds the facility stock planner · 17 Oct 2026</span>
     <div class="presets" role="group" aria-label="Scenarios">
       <button class="preset" data-preset="base" aria-pressed="true">Current capacity</button>
       <button class="preset" data-preset="utange">Utange unit added</button>
@@ -216,6 +224,81 @@ footer{border-top:1px solid var(--line); padding-top:16px; font-size:12px; color
     </div>
   </section>
 
+  <!-- PANEL 4: FACILITY STOCK PLANNER -->
+  <section class="block" id="supplies">
+    <h2 class="sec">4 · What should an isolation unit stock?</h2>
+    <p class="sub">Converts the expected number of patients in isolation (the mean trajectory from panel 3) into PPE and infection-control stock for one facility. Demand is built from a care model: how often staff enter the red zone, how many go in together, and how many patients they see per entry. The quantities are planning assumptions, not published norms. Overwrite them with your facility's SOP or Ministry of Health IPC guidance.</p>
+    <div class="main">
+      <aside class="rail" aria-label="Stock planner controls">
+        <div class="group">
+          <h3>Demand source</h3>
+          <div class="ctl"><span style="font-size:13px">City</span>
+            <div class="toggle" role="group" aria-label="City"><button data-supcity="Nairobi" aria-pressed="false">Nairobi</button><button data-supcity="Mombasa" aria-pressed="true">Mombasa</button></div></div>
+          <div class="ctl"><span style="font-size:13px">Patients to plan for</span>
+            <div class="toggle" role="group" aria-label="Patients to plan for"><button data-supmode="model" aria-pressed="true">Modelled trajectory</button><button data-supmode="full" aria-pressed="false">Every bed full</button></div>
+            <span class="hint">"Every bed full" is the ceiling: beds are a hard cap, so no scenario can need more.</span></div>
+          <div class="ctl"><label for="sup_share">Share of the city's isolation patients at this facility <output id="o_sup_facility_share"></output></label>
+            <input type="range" id="sup_share" data-sup="drivers.facility_share" min="0.05" max="1" step="0.05">
+            <span class="hint">Use less than 100% when the city's beds are split across units.</span></div>
+        </div>
+        <div class="group">
+          <h3>Care model</h3>
+          <div class="ctl"><label for="sup_visits">Red-zone visits per patient per day <output id="o_sup_visits_per_patient_day"></output></label>
+            <input type="range" id="sup_visits" data-sup="drivers.visits_per_patient_day" min="1" max="8" step="1"></div>
+          <div class="ctl"><label for="sup_ppe">Patients seen per entry <output id="o_sup_patients_per_entry"></output></label>
+            <input type="range" id="sup_ppe" data-sup="drivers.patients_per_entry" min="1" max="8" step="1">
+            <span class="hint">More patients per entry means fewer PPE sets but more glove changes.</span></div>
+          <div class="ctl"><label for="sup_staff">Staff per entry <output id="o_sup_staff_per_entry"></output></label>
+            <input type="range" id="sup_staff" data-sup="drivers.staff_per_entry" min="1" max="4" step="1">
+            <span class="hint">2 = a nurse plus a second clinician or buddy. Every person entering uses a full PPE set.</span></div>
+          <div class="ctl"><label for="sup_support">Support entries per occupied bed-day <output id="o_sup_support_entries_per_bed_day"></output></label>
+            <input type="range" id="sup_support" data-sup="drivers.support_entries_per_bed_day" min="0" max="1.5" step="0.1">
+            <span class="hint">Cleaners, waste handlers, food and laboratory staff.</span></div>
+        </div>
+        <div class="group">
+          <h3>Stocking rule</h3>
+          <div class="ctl"><label for="sup_window">Stock to cover <output id="o_sup_window_days"></output></label>
+            <input type="range" id="sup_window" data-sup="drivers.window_days" min="7" max="90" step="1">
+            <span class="hint">Set to your resupply lead time. The busiest stretch of that length is used.</span></div>
+          <div class="ctl"><label for="sup_buffer">Safety buffer <output id="o_sup_buffer"></output></label>
+            <input type="range" id="sup_buffer" data-sup="drivers.buffer" min="0" max="1" step="0.05"></div>
+        </div>
+        <details>
+          <summary>Cleaning and water assumptions</summary>
+          <div class="ctl"><label for="sup_l05">0.5% chlorine held per occupied bed <output id="o_sup_litres_0_5pct_standing_per_bed"></output></label>
+            <input type="range" id="sup_l05" data-sup="chlorine.litres_0_5pct_standing_per_bed" min="0" max="15" step="1">
+            <span class="hint">Buckets and spray solution for surfaces, spills and equipment. NaDCC at 67.5% available chlorine (WHO lists 65–70%).</span></div>
+          <div class="ctl"><label for="sup_refresh">Fresh 0.5% batches per day <output id="o_sup_refreshes_per_day"></output></label>
+            <input type="range" id="sup_refresh" data-sup="chlorine.refreshes_per_day" min="1" max="4" step="1">
+            <span class="hint">Kenya MoH 2010: make fresh solution every morning, after 8 hours, or when dirty. 3 per day fits that.</span></div>
+          <div class="ctl"><label for="sup_l005">0.05% chlorine per staff entry <output id="o_sup_litres_0_05pct_per_entry"></output></label>
+            <input type="range" id="sup_l005" data-sup="chlorine.litres_0_05pct_per_entry" min="0" max="6" step="0.5">
+            <span class="hint">Hand-washing, glove and boot disinfection on exit.</span></div>
+        </details>
+        <div class="actions"><button class="btn" id="sup_reset">Reset assumptions</button><button class="btn" id="sup_csv">Download stock list (CSV)</button></div>
+      </aside>
+      <div class="content">
+        <article class="card" style="border-top:3px solid var(--accent)">
+          <div class="card-head"><h4 id="sup_title">Mombasa unit</h4><span class="chip warn" id="sup_chip"></span></div>
+          <div class="stats" id="sup_stats"></div>
+          <div class="meta" id="sup_meta"></div>
+        </article>
+        <div class="block" style="padding:16px">
+          <div class="panel-head"><h4>PPE sets needed per day</h4><span class="legend" id="sup_legend">one full set per person entering the red zone</span></div>
+          <div class="chart" id="ch_sup"></div>
+        </div>
+        <div class="block" style="padding:16px">
+          <div class="panel-head"><h4>Stock list</h4><span class="legend">edit any quantity; enter your stock to see days of cover</span></div>
+          <div class="tablewrap notes"><table class="suptable">
+            <thead><tr><th>Item</th><th class="num">Stock to hold</th><th class="num">Peak per day</th><th>Quantity per unit</th><th>On hand</th><th class="num">Days of cover at peak</th></tr></thead>
+            <tbody id="sup_rows"></tbody>
+          </table></div>
+        </div>
+        <p class="hint" id="sup_note" style="margin:0"></p>
+      </div>
+    </div>
+  </section>
+
   <!-- METHODS -->
   <section class="block notes">
     <h4>How the model works</h4>
@@ -242,6 +325,295 @@ footer{border-top:1px solid var(--line); padding-top:16px; font-size:12px; color
   </footer>
 </div>
 
+<script type="application/json" id="supplies-defaults">
+{
+ "version": "0.4",
+ "note": "Planning defaults. Item types and practice rules follow the WHO Infection prevention and control guideline for Ebola and Marburg diseases (2025), cross-checked against the Kenya National IPC Guidelines 2010 (MoH), the WHO Disease Commodity Package for Ebola 2018 and the KMA Ebola circular 2026 (sources listed per item). None of them gives per-patient quantities, so per-entry quantities and care-model drivers are assumptions to be replaced with the facility SOP.",
+ "drivers": {
+  "visits_per_patient_day": 4,
+  "patients_per_entry": 4,
+  "staff_per_entry": 2,
+  "support_entries_per_bed_day": 0.5,
+  "min_entries_per_day_if_occupied": 3,
+  "window_days": 30,
+  "buffer": 0.25,
+  "facility_share": 1.0
+ },
+ "chlorine": {
+  "available_fraction": 0.675,
+  "litres_0_5pct_standing_per_bed": 5,
+  "refreshes_per_day": 3,
+  "litres_0_05pct_per_entry": 2
+ },
+ "items": [
+  {
+   "id": "coverall",
+   "name": "Coverall, fluid-resistant (or gown)",
+   "unit": "pieces",
+   "basis": "entry",
+   "qty": 1,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO",
+    "KMA"
+   ]
+  },
+  {
+   "id": "apron",
+   "name": "Apron, disposable (changed between patients)",
+   "unit": "pieces",
+   "basis": "entry",
+   "qty": 1,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO",
+    "KMA"
+   ],
+   "support_qty": 0,
+   "per_change": 1
+  },
+  {
+   "id": "hood",
+   "name": "Head-and-neck covering (not needed if the coverall has a hood)",
+   "unit": "pieces",
+   "basis": "entry",
+   "qty": 1,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO"
+   ]
+  },
+  {
+   "id": "mask",
+   "name": "Medical mask, fluid-resistant, structured",
+   "unit": "pieces",
+   "basis": "entry",
+   "qty": 1,
+   "reuse": 1,
+   "listed": [
+    "WHO"
+   ]
+  },
+  {
+   "id": "respirator",
+   "name": "N95 / FFP2 respirator (aerosol-generating procedures only)",
+   "unit": "pieces",
+   "basis": "entry",
+   "qty": 0,
+   "reuse": 1,
+   "listed": [
+    "WHO",
+    "KMA"
+   ]
+  },
+  {
+   "id": "faceshield",
+   "name": "Face shield or goggles (disinfected, reused)",
+   "unit": "pieces",
+   "basis": "entry",
+   "qty": 1,
+   "reuse": 10,
+   "listed": [
+    "MoH",
+    "WHO",
+    "KMA"
+   ]
+  },
+  {
+   "id": "gloves",
+   "name": "Nitrile gloves, inner and outer pair (outer pair renewed between patients)",
+   "unit": "pairs",
+   "basis": "entry",
+   "qty": 2,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO",
+    "KMA"
+   ],
+   "support_qty": 1,
+   "per_change": 1
+  },
+  {
+   "id": "boots",
+   "name": "Rubber boots, knee-high (disinfected, reused)",
+   "unit": "pairs",
+   "basis": "entry",
+   "qty": 1,
+   "reuse": 30,
+   "listed": [
+    "MoH",
+    "WHO",
+    "KMA"
+   ]
+  },
+  {
+   "id": "scrubs",
+   "name": "Scrub suits, worn under PPE (laundered at the facility)",
+   "unit": "sets",
+   "basis": "entry",
+   "qty": 1,
+   "reuse": 3,
+   "listed": [
+    "MoH",
+    "WHO"
+   ]
+  },
+  {
+   "id": "heavygloves",
+   "name": "Heavy-duty outer gloves for cleaners, waste and burial teams (disinfected, reused)",
+   "unit": "pairs",
+   "basis": "support",
+   "qty": 1,
+   "reuse": 10,
+   "listed": [
+    "MoH",
+    "WHO"
+   ]
+  },
+  {
+   "id": "heavyapron",
+   "name": "Heavy-duty reusable apron for cleaners, waste and burial teams",
+   "unit": "pieces",
+   "basis": "support",
+   "qty": 1,
+   "reuse": 30,
+   "listed": [
+    "WHO"
+   ]
+  },
+  {
+   "id": "wastebag",
+   "name": "Biohazard waste bags",
+   "unit": "bags",
+   "basis": "entry",
+   "qty": 0.3,
+   "reuse": 1,
+   "listed": [
+    "WHO"
+   ]
+  },
+  {
+   "id": "sharps",
+   "name": "Sharps containers, 5 L",
+   "unit": "containers",
+   "basis": "bedday",
+   "qty": 0.05,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO"
+   ]
+  },
+  {
+   "id": "handrub",
+   "name": "Alcohol-based hand rub, 100 mL bottles",
+   "unit": "bottles",
+   "basis": "entry",
+   "qty": 0.15,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO"
+   ],
+   "per_change": 0.05
+  },
+  {
+   "id": "bodybag",
+   "name": "Body bags, adult",
+   "unit": "bags",
+   "basis": "death",
+   "qty": 1,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO"
+   ]
+  },
+  {
+   "id": "chlorine",
+   "name": "Chlorine NaDCC granules",
+   "unit": "kg",
+   "basis": "chlorine",
+   "qty": 1,
+   "reuse": 1,
+   "listed": [
+    "MoH",
+    "WHO"
+   ]
+  },
+  {
+   "id": "water",
+   "name": "Water supply",
+   "unit": "m3",
+   "basis": "bedday",
+   "qty": 0.15,
+   "reuse": 1,
+   "listed": [
+    "UNICEF",
+    "IMC"
+   ]
+  },
+  {
+   "id": "basins",
+   "name": "Hand-washing basins with hands-off taps (minimum)",
+   "unit": "basins",
+   "basis": "fixture",
+   "qty": 0.1667,
+   "reuse": 1,
+   "listed": [
+    "MoH"
+   ]
+  },
+  {
+   "id": "soapdisp",
+   "name": "Soap dispensers, hands-off",
+   "unit": "dispensers",
+   "basis": "fixture",
+   "qty": 0.1667,
+   "reuse": 1,
+   "listed": [
+    "MoH"
+   ]
+  },
+  {
+   "id": "buckets",
+   "name": "Waste buckets with lids",
+   "unit": "buckets",
+   "basis": "fixture",
+   "qty": 0.5,
+   "reuse": 1,
+   "listed": [
+    "MoH"
+   ]
+  },
+  {
+   "id": "linenbins",
+   "name": "Large lidded bins for soaking linen",
+   "unit": "bins",
+   "basis": "fixture",
+   "qty": 0.1667,
+   "reuse": 1,
+   "listed": [
+    "MoH"
+   ]
+  }
+ ],
+ "reference_prices_usd": {
+  "note": "Average unit costs quoted in the WHO 2025 guideline's resource sections, for later costing. Not used in any calculation yet.",
+  "goggles": 4.3,
+  "disposable_face_shield": 2.7,
+  "respirator_n95_ffp2": 1.53,
+  "coverall_type_3": 11.37,
+  "coverall_type_4": 5.34,
+  "coverall_type_5_6": 5.0,
+  "reusable_heavy_duty_apron": 7.0
+ }
+}
+</script>
 <script>
 "use strict";
 /* ---------- model core (deterministic two-group SEIHFR, detection-triggered response) ---------- */
@@ -394,6 +766,7 @@ function run(){
     res[c]={p,s,R0:R0(p),Rnb:R0(p,false),cases:s.C[n],deaths:s.D[n],peakH:Math.max(...s.H),beds:o.beds[c],
       growing:tail>prev*1.02&&tail>1};}
   last={o,res}; renderCards(res); renderCases(res,o); for(const c of ["Nairobi","Mombasa"])renderWard(c,res[c],o);
+  renderSupplies();
 }
 
 /* ---------- charts ---------- */
@@ -495,12 +868,148 @@ function renderWard(city,r,o){
     <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
   hover(el,el.querySelector("svg"),W,pad,x,days,d=>[`${r.s.H[d].toFixed(0)} in isolation`]);
 }
+/* ---------- panel 4: facility stock planner (mirrors src/supplies.py) ---------- */
+const SUP0=JSON.parse(document.getElementById("supplies-defaults").textContent);
+let SUP=JSON.parse(JSON.stringify(SUP0)); // live copy edited by the controls
+let supCity="Mombasa", supMode="model"; const onHand={}; let supLast=null;
+const BASIS_LABEL={entry:"staff entry",support:"support entry (cleaners, waste)",death:"death in the unit",bedday:"occupied bed-day",fixture:"occupied bed (equipment to install)",chlorine:"set by the cleaning sliders"};
+const n1=v=>v>=100?Math.round(v).toLocaleString("en"):v>=10?v.toFixed(0):v.toFixed(1);
+function supDaily(occ){
+  const d=SUP.drivers,ch=SUP.chlorine,n=occ.length,out={ppe_sets:new Float64Array(n),staff_entries:new Float64Array(n),deaths:new Float64Array(n)};
+  for(const it of SUP.items)out[it.id]=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    const o=occ[i],on=o>=0.5;
+    const clin=on?Math.max(d.visits_per_patient_day*o/d.patients_per_entry,d.min_entries_per_day_if_occupied):0;
+    const staff=clin*d.staff_per_entry,supp=on?d.support_entries_per_bed_day*o:0,sets=staff+supp;
+    const seen=Math.min(Math.max(o,1),d.patients_per_entry),deaths=o*NH.cfr_hosp/NH.hosp_to_outcome;
+    const kg=(o*ch.litres_0_5pct_standing_per_bed*ch.refreshes_per_day*5+sets*ch.litres_0_05pct_per_entry*0.5)/ch.available_fraction/1000;
+    out.ppe_sets[i]=sets;out.staff_entries[i]=staff;out.deaths[i]=deaths;
+    for(const it of SUP.items){let v;
+      if(it.basis==="entry")v=(staff*(it.qty+(it.per_change||0)*(seen-1))+supp*(it.support_qty!==undefined?it.support_qty:it.qty))/it.reuse;
+      else if(it.basis==="support")v=supp*it.qty/it.reuse;
+      else if(it.basis==="fixture")v=on?o*it.qty:0;
+      else if(it.basis==="death")v=deaths*it.qty;
+      else if(it.basis==="chlorine")v=kg;
+      else v=o*it.qty;
+      out[it.id][i]=v;}
+  }
+  return out;
+}
+function rollMax(x,w){ // busiest run of w consecutive days: its total and start day
+  w=Math.max(1,Math.min(Math.round(w),x.length));let s=0;for(let i=0;i<w;i++)s+=x[i];
+  let best=s,at=0;for(let i=w;i<x.length;i++){s+=x[i]-x[i-w];if(s>best){best=s;at=i-w+1;}}
+  return {best,at,w};
+}
+function supStock(dem){
+  const w=SUP.drivers.window_days,b=SUP.drivers.buffer;
+  return SUP.items.map(it=>{const x=dem[it.id],peak=Math.max(...x);
+    const win=it.basis==="fixture"?peak:rollMax(x,w).best; // equipment is counted at peak occupancy, not summed over days
+    return {it,peak,window:win,stock:Math.max(0,Math.ceil(win*(1+b)-1e-9))};});
+}
+function supOutputText(){
+  const d=SUP.drivers,c=SUP.chlorine;
+  const set=(k,t)=>{const e=$("o_sup_"+k);if(e)e.textContent=t;};
+  set("facility_share",pct(d.facility_share));set("visits_per_patient_day",d.visits_per_patient_day);
+  set("patients_per_entry",d.patients_per_entry);set("staff_per_entry",d.staff_per_entry);
+  set("support_entries_per_bed_day",d.support_entries_per_bed_day.toFixed(1));
+  set("window_days",d.window_days+" days");set("buffer",pct(d.buffer));
+  set("litres_0_5pct_standing_per_bed",c.litres_0_5pct_standing_per_bed+" L");set("refreshes_per_day",c.refreshes_per_day+" per day");set("litres_0_05pct_per_entry",c.litres_0_05pct_per_entry+" L");
+}
+function renderSupplies(){
+  if(!last)return; supOutputText();
+  const r=last.res[supCity],share=SUP.drivers.facility_share;
+  const occ=Array.from(r.s.H,h=>share*(supMode==="full"?r.beds:Math.min(h,r.beds))); // beds are a hard cap
+  const dem=supDaily(occ),w=SUP.drivers.window_days,buf=SUP.drivers.buffer,rows=supStock(dem);
+  const peakOcc=Math.max(...occ),maxSets=Math.max(...dem.ppe_sets),pk=dem.ppe_sets.indexOf(maxSets);
+  const win=rollMax(dem.ppe_sets,w);
+  let winDeaths=0;for(let i=win.at;i<win.at+win.w;i++)winDeaths+=dem.deaths[i];
+  const none=peakOcc<0.5;
+  $("sup_title").textContent=`${supCity} unit${share<1?` (${pct(share)} of patients)`:""}`;
+  $("sup_chip").className="chip "+(none?"good":"warn");
+  $("sup_chip").textContent=none?"No ward opens":(supMode==="full"?"Ceiling: every bed full":"Mean trajectory");
+  const stat=(k,v)=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  $("sup_stats").innerHTML=[
+    stat("Peak patients in unit",none?"0":n1(peakOcc)),
+    stat("Peak PPE sets per day",none?"0":n1(maxSets)),
+    stat("Staff entries per day, peak",none?"0":n1(Math.max(...dem.staff_entries))),
+    stat(`PPE sets to hold (${w} d + buffer)`,none?"0":Math.ceil(win.best*(1+buf)).toLocaleString("en")),
+    stat(`Deaths in busiest ${w} d`,none?"0":n1(winDeaths)),
+    stat("Demand peaks on day",none||supMode==="full"?"—":(pk>=dem.ppe_sets.length-1?"end of horizon":pk))
+  ].join("");
+  $("sup_meta").textContent=none
+    ?"At these settings the outbreak is contained before an isolation ward is needed in the mean trajectory. Stochastic runs can still produce a large outbreak (panel 1), so use \"Every bed full\" for a ceiling."
+    :supMode==="full"
+      ?`Every bed occupied every day, the most any scenario can demand because beds are a hard cap. Stock covers ${w} days plus ${pct(buf)}.`
+      :`Mean (expected) trajectory from panel 3. Stock is the busiest ${w}-day stretch plus ${pct(buf)}. Individual outbreaks vary around this mean.`;
+  // table cells
+  rows.forEach(({it,peak,stock})=>{
+    $("sup_peak_"+it.id).textContent=none?"0":n1(peak);
+    $("sup_stock_"+it.id).textContent=none?"0":stock.toLocaleString("en");
+    const oh=parseFloat(onHand[it.id]);const el=$("sup_cover_"+it.id);
+    if(!(oh>=0)||none||peak<=0||it.basis==="fixture"){el.textContent="—";el.className="num";}
+    else{const dcov=oh/peak;el.textContent=dcov>=100?"100+":dcov.toFixed(1);
+      el.className="num cover "+(dcov<7?"bad":dcov<w?"warn":"good");}
+  });
+  supLast={rows,occ,dem,r,none};
+  renderSupChart(dem,win,none);
+  $("sup_note").innerHTML=`<strong>Where the items come from.</strong> Tags show which sources list each item: MoH = Kenya National IPC Guidelines (Dec 2010; viral haemorrhagic fever list and ward-design standards), WHO = WHO Disease Commodity Package for Ebola (<a href="https://cdn.who.int/media/docs/default-source/disease-commodity-packages/dcp-ebola.pdf">2018</a>), KMA = Kenya Medical Association Ebola circular (2026), UNICEF and IMC = water planning figures. The practice rules follow the <a href="https://www.who.int/publications/i/item/9789240111332">WHO IPC guideline for Ebola and Marburg diseases (2025)</a>: coverall, head-and-neck covering, a medical mask with eye protection, two pairs of nitrile gloves with the outer pair renewed between patients, an apron changed between patients, and heavy-duty gloves and aprons for cleaners and burial teams. WHO reserves N95 respirators for aerosol-generating procedures, so the default is zero; set it to your procedure rate. Scrubs are on-duty wear, not PPE. WHO cites roughly an hour as a typical time in PPE (65.7 minutes in a 2014 field study), which is why a team entry covers a handful of patients. No source gives per-patient quantities, so the quantities and care-model settings are assumptions. The 2010 MoH list predates 2014 and does not name coveralls. Basins, soap dispensers, buckets and bins are counted at peak occupancy, using the MoH minimum of one basin per six-bed cubicle; the other fixture ratios are assumptions. Body bags assume 31% isolation-ward case fatality and a 6-day stay. Days of cover is stock on hand divided by the peak daily need.`;
+}
+function renderSupChart(dem,win,none){
+  const el=$("ch_sup"),W=760,H=220,pad={l:48,r:12,t:12,b:26},days=dem.ppe_sets.length-1;
+  const x=sLin(0,days,pad.l,W-pad.r),top=Math.max(Math.max(...dem.ppe_sets)*1.1,5),tk=ticks(top,4),y=sLin(0,tk[tk.length-1],H-pad.b,pad.t);
+  const line=Array.from(dem.ppe_sets,(v,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const area=line+`L${x(days)},${y(0)}L${x(0)},${y(0)}Z`;
+  const shade=none||supMode==="full"?"":`<rect x="${x(win.at)}" y="${pad.t}" width="${Math.max(x(win.at+win.w)-x(win.at),1)}" height="${H-pad.b-pad.t}" fill="var(--mombasa)" fill-opacity="0.12"/><text x="${x(win.at)>W*0.7?x(win.at+win.w)-4:x(win.at)+4}" y="${pad.t+10}" text-anchor="${x(win.at)>W*0.7?"end":"start"}" style="fill:var(--mombasa)">busiest ${win.w} days</text>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="PPE sets needed per day">
+    ${tk.map(t=>`<line x1="${pad.l}" x2="${W-pad.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${pad.l-6}" y="${y(t)+3}" text-anchor="end">${fmt(t)}</text>`).join("")}
+    ${ticks(days,6).map(t=>`<text x="${x(t)}" y="${H-8}" text-anchor="middle">${t}</text>`).join("")}
+    ${shade}<path d="${area}" fill="var(--accent)" fill-opacity="0.14"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <line class="cross" y1="${pad.t}" y2="${H-pad.b}" stroke="var(--ink)" stroke-width="1" style="opacity:0"/>
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  hover(el,el.querySelector("svg"),W,pad,x,days,d=>[`${n1(dem.ppe_sets[d])} PPE sets`,`${n1(dem.occupied?dem.occupied[d]:0)} patients`]);
+}
+function buildSupTable(){
+  $("sup_rows").innerHTML=SUP.items.map((it,i)=>{
+    const per=BASIS_LABEL[it.basis]
+      +(it.basis==="entry"&&it.support_qty!==undefined&&it.support_qty!==it.qty?`; ${it.support_qty} per support entry`:"")
+      +(it.per_change?`; plus ${it.per_change} per extra patient seen`:"")+(it.reuse>1?`; reused ×${it.reuse}`:"");
+    const q=it.basis==="chlorine"?"":`<input class="numin" type="number" min="0" step="any" value="${it.qty}" data-qty="${i}" aria-label="Quantity of ${it.name} per ${BASIS_LABEL[it.basis]}">`;
+    return `<tr><td>${it.name}<span class="per">${it.unit} · listed in ${it.listed.join(", ")}</span></td>`+
+      `<td class="num" id="sup_stock_${it.id}" style="font-weight:600"></td><td class="num" id="sup_peak_${it.id}"></td>`+
+      `<td>${q}<span class="per">${it.basis==="chlorine"?"":"per "}${per}</span></td>`+
+      `<td><input class="numin" type="number" min="0" step="any" placeholder="stock" data-hand="${it.id}" value="${onHand[it.id]??""}" aria-label="Stock on hand: ${it.name}"></td>`+
+      `<td class="num cover" id="sup_cover_${it.id}"></td></tr>`;}).join("");
+  document.querySelectorAll("[data-qty]").forEach(e=>e.addEventListener("input",()=>{
+    const v=parseFloat(e.value);if(v>=0){SUP.items[+e.dataset.qty].qty=v;renderSupplies();}}));
+  document.querySelectorAll("[data-hand]").forEach(e=>e.addEventListener("input",()=>{onHand[e.dataset.hand]=e.value;renderSupplies();}));
+}
+function syncSupControls(){
+  document.querySelectorAll("[data-sup]").forEach(e=>{const [g,k]=e.dataset.sup.split(".");e.value=SUP[g][k];});
+  document.querySelectorAll("[data-supcity]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.supcity===supCity));
+  document.querySelectorAll("[data-supmode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.supmode===supMode));
+}
+function initSupplies(){
+  buildSupTable(); syncSupControls();
+  document.querySelectorAll("[data-sup]").forEach(e=>e.addEventListener("input",()=>{
+    const [g,k]=e.dataset.sup.split(".");SUP[g][k]=parseFloat(e.value);renderSupplies();}));
+  document.querySelectorAll("[data-supcity]").forEach(b=>b.addEventListener("click",()=>{supCity=b.dataset.supcity;syncSupControls();renderSupplies();}));
+  document.querySelectorAll("[data-supmode]").forEach(b=>b.addEventListener("click",()=>{supMode=b.dataset.supmode;syncSupControls();renderSupplies();}));
+  $("sup_reset").addEventListener("click",()=>{SUP=JSON.parse(JSON.stringify(SUP0));buildSupTable();syncSupControls();renderSupplies();});
+  $("sup_csv").addEventListener("click",()=>{
+    if(!supLast)return;const d=SUP.drivers,q=s=>`"${String(s).replace(/"/g,'""')}"`;
+    const head=[`# ${supCity} isolation unit, ${supMode==="full"?"every bed full":"mean modelled trajectory"}; stock covers the busiest ${d.window_days} days plus ${pct(d.buffer)}`,
+      "# Planning assumptions, not published norms. Generated by the Kenya BVD Outbreak Simulator.","item,unit,peak_per_day,stock_to_hold"];
+    const body=supLast.rows.map(({it,peak,stock})=>[q(it.name),it.unit,supLast.none?0:peak.toFixed(2),supLast.none?0:stock].join(","));
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([head.concat(body).join("\n")],{type:"text/csv"}));
+    a.download=`stock-list-${supCity.toLowerCase()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
+}
+
 function setPreset(name){const p=PRESETS[name];
   $("detect").value=p.detect;$("contact_cut").value=p.cut;$("isolation_speedup").value=p.sp;$("s_c_resp").value=p.s_c_resp;$("omega").value=p.omega;
   $("beds_Nairobi").value=p.bN;$("beds_Mombasa").value=p.bM;
   document.querySelectorAll(".preset").forEach(b=>b.setAttribute("aria-pressed",b.dataset.preset===name));run();}
 let pending=null;
-document.querySelectorAll("input[type=range]").forEach(i=>i.addEventListener("input",()=>{
+document.querySelectorAll("input[type=range]:not([data-sup])").forEach(i=>i.addEventListener("input",()=>{
   document.querySelectorAll(".preset").forEach(b=>b.setAttribute("aria-pressed","false"));
   if(pending)cancelAnimationFrame(pending);pending=requestAnimationFrame(run);}));
 document.querySelectorAll(".preset").forEach(b=>b.addEventListener("click",()=>setPreset(b.dataset.preset)));
@@ -512,6 +1021,7 @@ $("sc_lin").addEventListener("click",()=>{logScale=false;$("sc_lin").setAttribut
 function syncDetTarget(){const d=parseFloat($("detect").value);detTarget=d<=5?"3":d<=10?"7":"14";}
 $("detect").addEventListener("input",syncDetTarget);
 syncDetTarget();
+initSupplies();
 setPreset("base");
 </script>
 </body>
